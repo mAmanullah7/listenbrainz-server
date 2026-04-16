@@ -34,6 +34,7 @@ import AppleMusicPlayer from "./AppleMusicPlayer";
 import InternetArchivePlayer from "./InternetArchivePlayer";
 import FunkwhalePlayer from "./FunkwhalePlayer";
 import NavidromePlayer from "./NavidromePlayer";
+import TidalPlayer from "./TidalPlayer";
 import {
   DataSourceKey,
   defaultDataSourcesPriority,
@@ -92,7 +93,8 @@ export type DataSourceTypes =
   | AppleMusicPlayer
   | InternetArchivePlayer
   | FunkwhalePlayer
-  | NavidromePlayer;
+  | NavidromePlayer
+  | TidalPlayer;
 
 export type DataSourceProps = {
   volume?: number;
@@ -149,6 +151,9 @@ function isListenFromDatasource(
   if (datasource instanceof NavidromePlayer) {
     return NavidromePlayer.isListenFromThisService(listen);
   }
+  if (datasource instanceof TidalPlayer) {
+    return TidalPlayer.isListenFromThisService(listen);
+  }
   if (datasource instanceof InternetArchivePlayer) {
     return InternetArchivePlayer.isListenFromThisService(listen);
   }
@@ -167,6 +172,7 @@ export default function BrainzPlayer() {
     appleAuth,
     funkwhaleAuth,
     navidromeAuth,
+    tidalAuth,
     userPreferences,
   } = globalAppContext;
 
@@ -174,6 +180,7 @@ export default function BrainzPlayer() {
     refreshSpotifyToken,
     refreshYoutubeToken,
     refreshSoundcloudToken,
+    refreshTidalToken,
     refreshFunkwhaleToken: apiRefreshFunkwhaleToken,
     APIBaseURI: listenBrainzAPIBaseURI,
   } = APIService;
@@ -300,6 +307,7 @@ export default function BrainzPlayer() {
     appleMusicEnabled = true,
     funkwhaleEnabled = true,
     navidromeEnabled = true,
+    tidalEnabled = true,
     soundcloudEnabled = true,
     youtubeEnabled = true,
     internetArchiveEnabled = true,
@@ -315,6 +323,7 @@ export default function BrainzPlayer() {
       internetArchiveEnabled === false &&
       funkwhaleEnabled === false &&
       navidromeEnabled === false &&
+      tidalEnabled === false &&
       appleMusicEnabled === false);
 
   const enabledDataSources = [
@@ -328,6 +337,7 @@ export default function BrainzPlayer() {
     navidromeEnabled &&
       NavidromePlayer.hasPermissions(navidromeAuth) &&
       "navidrome",
+    tidalEnabled && TidalPlayer.hasPermissions(tidalAuth) && "tidal",
     soundcloudEnabled &&
       SoundcloudPlayer.hasPermissions(soundcloudAuth) &&
       "soundcloud",
@@ -351,6 +361,7 @@ export default function BrainzPlayer() {
   const internetArchivePlayerRef = React.useRef<InternetArchivePlayer>(null);
   const funkwhalePlayerRef = React.useRef<FunkwhalePlayer>(null);
   const navidromePlayerRef = React.useRef<NavidromePlayer>(null);
+  const tidalPlayerRef = React.useRef<TidalPlayer>(null);
   const dataSourceRefs: Array<React.RefObject<
     DataSourceTypes
   >> = React.useMemo(() => {
@@ -377,6 +388,9 @@ export default function BrainzPlayer() {
           break;
         case "navidrome":
           dataSources.push(navidromePlayerRef);
+          break;
+        case "tidal":
+          dataSources.push(tidalPlayerRef);
           break;
         default:
         // do nothing
@@ -1095,13 +1109,19 @@ export default function BrainzPlayer() {
     ) {
       invalidateDataSource(funkwhalePlayerRef.current);
     }
+    if (
+      !TidalPlayer.hasPermissions(tidalAuth) &&
+      tidalPlayerRef?.current
+    ) {
+      invalidateDataSource(tidalPlayerRef.current);
+    }
     return () => {
       window.removeEventListener("message", receiveBrainzPlayerMessage);
       window.removeEventListener("beforeunload", alertBeforeClosingPage);
       stopPlayerStateTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spotifyAuth, soundcloudAuth, navidromeAuth, appleAuth, funkwhaleAuth]);
+  }, [spotifyAuth, soundcloudAuth, navidromeAuth, appleAuth, funkwhaleAuth, tidalAuth]);
 
   const { pathname } = useLocation();
 
@@ -1240,6 +1260,24 @@ export default function BrainzPlayer() {
                 volume={volume}
                 onInvalidateDataSource={invalidateDataSource}
                 ref={navidromePlayerRef}
+                playerPaused={playerPaused}
+                onPlayerPausedChange={playerPauseChange}
+                onProgressChange={progressChange}
+                onDurationChange={durationChange}
+                onTrackInfoChange={throttledTrackInfoChange}
+                onTrackEnd={playNextTrack}
+                onTrackNotFound={failedToPlayTrack}
+                handleError={handleError}
+                handleWarning={handleWarning}
+                handleSuccess={handleSuccess}
+              />
+            )}
+            {tidalEnabled !== false && (
+              <TidalPlayer
+                volume={volume}
+                onInvalidateDataSource={invalidateDataSource}
+                ref={tidalPlayerRef}
+                refreshTidalToken={refreshTidalToken}
                 playerPaused={playerPaused}
                 onPlayerPausedChange={playerPauseChange}
                 onProgressChange={progressChange}
